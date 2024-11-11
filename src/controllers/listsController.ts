@@ -36,6 +36,7 @@ function getListById(id: string): ITodoList | undefined {
   return staticLists.find((list) => list.id === id);
 }
 
+// A function that adds a new list 
 export const addList = async (request: FastifyRequest<{ Body: ITodoList }>, reply: FastifyReply) => {
   const { id, description, items } = request.body;
   const existingList = await getListById(id); 
