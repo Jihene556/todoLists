@@ -31,7 +31,7 @@ export const listLists = async (
   })
 }
 
-// A function that returns the 
+// A function that returns the list corresponding to a given id 
 function getListById(id: string): ITodoList | undefined {
   return staticLists.find((list) => list.id === id);
 }
