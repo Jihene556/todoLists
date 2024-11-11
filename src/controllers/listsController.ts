@@ -20,20 +20,6 @@ const staticLists: ITodoList[] = [
       "state": "IN-PROGRESS"},]
   }
 ]
-/*
-const staticItems: IItem[] = [
-  {
-  id : "item-1",
-  description: "finish the workshop",
-  state : 'PENDING' 
-},
-{
-  id : "item-2",
-  description: "send the work to the professor",
-  state: "IN-PROGRESS" 
-}
-]
-*/
 
 export const listLists = async (
  request: FastifyRequest, 
