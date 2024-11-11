@@ -2,160 +2,167 @@ import { FastifyReply, FastifyRequest } from "fastify"
 import { ITodoList } from "../interfaces"
 import { IItem } from "../interfaces"
 
-const staticLists: ITodoList[] = [
-  {
-	id: 'l-1',
-	description: 'Dev tasks',
-  items: [{
-    "id": "item-1",
-    "description": "finish the workshop",
-    "state": "PENDING"
-  },],
-  },
-  {
-  id: 'l-2',
-	description: 'Dev tasks2',
-  items: [{"id": "item-2",
-      "description": "send the work to the professor",
-      "state": "IN-PROGRESS"},]
+// A function to display all the todo-lists
+export async function listLists(this: any, 
+  request: FastifyRequest, 
+  reply: FastifyReply
+) {
+  console.log('DB status', this.level.db.status)
+  const listsIter = this.level.db.iterator()
+
+  const result: ITodoList[] = []
+  for await (const [, value] of listsIter) {
+    result.push(JSON.parse(value))
   }
-]
-/*
-const staticItems: IItem[] = [
-  {
-  id : "item-1",
-  description: "finish the workshop",
-  state : 'PENDING' 
-},
-{
-  id : "item-2",
-  description: "send the work to the professor",
-  state: "IN-PROGRESS" 
-}
-]
-*/
-
-export const listLists = async (
- request: FastifyRequest, 
- reply: FastifyReply) => {
-
-  Promise.resolve(staticLists)
-  .then((item) => {
-	reply.send({ data: item })
-  })
+  reply.send({ data: result })
 }
 
-// A function that returns the 
-function getListById(id: string): ITodoList | undefined {
-  return staticLists.find((list) => list.id === id);
-}
-
-export const addList = async (request: FastifyRequest<{ Body: ITodoList }>, reply: FastifyReply) => {
-  const { id, description, items } = request.body;
-  const existingList = await getListById(id); 
+// A function to add a new list
+export async function addList(
+  this: any,
+  request: FastifyRequest, 
+  reply: FastifyReply
+){
+  const list = request.body as ITodoList;
   
-  if (existingList) {
-    reply.status(409).send({ message: 'This list already exists' });
-    return;
+  try {
+    const existingList = await this.level.db.get(list.id); 
+    if (existingList) {
+      return reply.status(409).send({ message: 'This list already exists' });
+    }
+  } catch (error) {
   }
 
-  if (!description && items) {
-    reply.status(400).send({ message: 'please insert a description for the list you want to add' });
-    return;
+  if (!list.description && list.items ) {
+    return reply.status(400).send({ message: 'Please insert a description for the list you want to add' });
   }
 
-  else if (description && !items) {
-    reply.status(401).send({ message: 'please insert items for the list you want to add' });
-    return;
+  if (list.description && !list.items) {
+    return reply.status(401).send({ message: 'Please insert items for the list you want to add' });
   }
 
-  else if (!description && !items) {
-    reply.status(402).send({ message: 'please insert a description and items for the list you want to add' });
-    return;
+  if (!list.description && !list.items) {
+    return reply.status(402).send({ message: 'Please insert a description and items for the list you want to add' });
   }
-  reply.send({ message: `added list: ${description}` });
-};
+
+  await this.level.db.put(list.id, JSON.stringify(list));  
+  reply.status(201).send({ message: 'List added successfully' });
+}
 
 //Update the description of a list
-export const updateList = async (request: FastifyRequest<{ Params: { id: string }, Body: { description: string } }>, reply: FastifyReply) => {
+export async function updateList(
+  this: any,
+  request: FastifyRequest<{ Params: { id: string }; Body: { description: string } }>,
+  reply: FastifyReply
+) {
   const { id } = request.params;
   const { description } = request.body;
-  const list = await getListById(id)
-  if (!list) {
-    reply.status(404).send({ message: 'this list does not exist in the database.' });
+    
+  const listData = await this.level.db.get(id);
+  if (!listData) {
+    reply.status(404).send({ message: 'This list does not exist in the database' });
     return;
   }
-  if (!description) {
-    return reply.status(400).send({ message: 'No new description provided'})
-  }
-  list.description = description;
 
+  const list = JSON.parse(listData) as ITodoList;
+
+  if (!description) {
+    reply.status(400).send({ message: 'No new description provided' });
+    return;
+  }
+
+  list.description = description;
+  await this.level.db.put(id, JSON.stringify(list));
   reply.send({ message: `List successfully updated: ${list.description}` });
+  
 }
 
 //Add an item to a list
-export const addItemToList = async (request: FastifyRequest<{ Params: { id: string }; Body: IItem }>, reply: FastifyReply) => {
+export async function addItemToList(
+  this: any,
+  request: FastifyRequest<{ Params: { id: string }; Body: IItem }>,
+  reply: FastifyReply
+) {
   const { id } = request.params;
   const { description, state } = request.body;
-  
-  const list = staticLists.find((list) => list.id === id);
-  if (!list) {
-    reply.status(404).send({ message: 'this list does not exist in the database' });
+
+  const listData = await this.level.db.get(id);
+  if (!listData) {
+    reply.status(404).send({ message: 'This list does not exist in the database' });
     return;
   }
 
+  const list = JSON.parse(listData) as ITodoList;
   const newItem: IItem = {
-    // Generating a unique id 
-    id: `item-${Math.random().toString(36).substring(2, 15)}`, 
+    // To generate a random item ID
+    id: `item-${Math.random().toString(36).substring(2, 15)}`,
     description,
     state
   };
 
   list.items.push(newItem);
+  await this.level.db.put(id, JSON.stringify(list));
+
   reply.status(200).send({ message: 'Item successfully added to the list' });
-};
+  
+}
 
 //Delete an item from the list 
-export const deleteItemFromList = async (request: FastifyRequest<{ Params: { listId: string; itemId: string } }>, reply: FastifyReply) => {
-  const { listId, itemId } = request.params;
+export async function deleteItemFromList(
+  this: any,
+  request: FastifyRequest<{ Params: { listId: string; itemId: string } }>,  // Typing for params
+  reply: FastifyReply
+) {
+  const { listId, itemId } = request.params;  
+    
+  const listData = await this.level.db.get(listId);
 
-  const list = staticLists.find((list) => list.id === listId);
-  if (!list) {
-    reply.status(404).send({ message: 'this list does not exist in the database' });
+  if (!listData) {
+    reply.status(404).send({ message: "This list does not exist in the database" });
     return;
   }
 
+  const list = JSON.parse(listData) as ITodoList;
   const itemIndex = list.items.findIndex((item) => item.id === itemId);
+
   if (itemIndex === -1) {
-    return reply.status(404).send({ message: 'Item not found in this list' });
+    reply.status(404).send({ message: "The item you want to delete does not exist in the database" });
+    return;
   }
 
   list.items.splice(itemIndex, 1);
-  reply.status(200).send({ message: 'Item successfully deleted from the list' });
-};
+  await this.level.db.put(listId, JSON.stringify(list));
+  reply.status(200).send({ message: "Item successfully deleted from the list" });
+  
+}
 
-//update an item in the list (description or state)
-export const updateItemInList = async (
+//update an item in the list (description or state or both)
+export async function updateItemInList (
+  this:any,
   request: FastifyRequest<{ Params: { listId: string; itemId: string }; Body: Partial<IItem> }>,
   reply: FastifyReply
-) => {
+) {
   const { listId, itemId } = request.params;
   const { description, state } = request.body;
 
-  const list = staticLists.find((l) => l.id === listId);
+  const list = await this.level.db.get(listId).catch(() => null);
   if (!list) {
     return reply.status(404).send({ message: 'this list does not exist in the database' });
   }
 
-  const item = list.items.find((item) => item.id === itemId);
+  const parsedList = JSON.parse(list);
+
+  const item = parsedList.items.find((item: { id: string }) => item.id === itemId);;
+
   if (!item) {
     return reply.status(404).send({ message: 'Item not found in this list' });
   }
 
-  // Update the item's properties
+  // Update the item's state and/or description
   if (description !== undefined) item.description = description;
   if (state !== undefined) item.state = state;
 
+  await this.level.db.put(listId, JSON.stringify(parsedList));
   reply.status(200).send({ message: 'Item updated successfully', item });
 };
 
