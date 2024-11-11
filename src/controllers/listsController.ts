@@ -17,10 +17,10 @@ const staticLists: ITodoList[] = [
 	description: 'Dev tasks2',
   items: [{"id": "item-2",
       "description": "send the work to the professor",
-      "state": "IN-PROGRESS"}]
+      "state": "IN-PROGRESS"},]
   }
 ]
-
+/*
 const staticItems: IItem[] = [
   {
   id : "item-1",
@@ -33,7 +33,7 @@ const staticItems: IItem[] = [
   state: "IN-PROGRESS" 
 }
 ]
-
+*/
 
 export const listLists = async (
  request: FastifyRequest, 
@@ -112,14 +112,14 @@ export const addItemToList = async (request: FastifyRequest<{ Params: { id: stri
   };
 
   list.items.push(newItem);
-  reply.status(201).send({ message: 'Item successfully added to the list', item: newItem });
+  reply.status(200).send({ message: 'Item successfully added to the list' });
 };
 
 //Delete an item from the list 
-export const deleteItemFromList = async (request: FastifyRequest<{ Params: { id: string; itemId: string } }>, reply: FastifyReply) => {
-  const { id, itemId } = request.params;
+export const deleteItemFromList = async (request: FastifyRequest<{ Params: { listId: string; itemId: string } }>, reply: FastifyReply) => {
+  const { listId, itemId } = request.params;
 
-  const list = staticLists.find((list) => list.id === id);
+  const list = staticLists.find((list) => list.id === listId);
   if (!list) {
     reply.status(404).send({ message: 'this list does not exist in the database' });
     return;
@@ -127,8 +127,7 @@ export const deleteItemFromList = async (request: FastifyRequest<{ Params: { id:
 
   const itemIndex = list.items.findIndex((item) => item.id === itemId);
   if (itemIndex === -1) {
-    reply.status(404).send({ message: 'This item does not exist in the list' });
-    return;
+    return reply.status(404).send({ message: 'Item not found in this list' });
   }
 
   list.items.splice(itemIndex, 1);
@@ -145,12 +144,12 @@ export const updateItemInList = async (
 
   const list = staticLists.find((l) => l.id === listId);
   if (!list) {
-    return reply.status(404).send({ message: 'List not found' });
+    return reply.status(404).send({ message: 'this list does not exist in the database' });
   }
 
   const item = list.items.find((item) => item.id === itemId);
   if (!item) {
-    return reply.status(404).send({ message: 'Item not found' });
+    return reply.status(404).send({ message: 'Item not found in this list' });
   }
 
   // Update the item's properties
